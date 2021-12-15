@@ -18,5 +18,16 @@
     <ClCompile Include="TriangulationForStandardStereo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="PLYWriter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="PLYWriter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="stereo_vision.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
