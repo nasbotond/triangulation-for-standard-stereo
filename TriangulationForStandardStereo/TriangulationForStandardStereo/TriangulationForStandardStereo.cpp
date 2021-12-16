@@ -13,8 +13,6 @@
 #include "opencv2/xfeatures2d.hpp"
 #include "PLYWriter.h"
 
-#include "stereo_vision.h"
-
 using namespace std;
 using namespace cv;
 using namespace cv::xfeatures2d;
@@ -81,7 +79,7 @@ int main()
         matcher->knnMatch(descriptors1, descriptors2, knn_matches, 2);
 
         //-- Filter matches using the Lowe's ratio test
-        const float ratio_thresh = 1.0f; // 0.5f
+        const float ratio_thresh = 0.7f; // 0.5f
         std::vector<DMatch> good_matches;
         for (size_t i = 0; i < knn_matches.size(); i++)
         {
@@ -118,7 +116,7 @@ int main()
             points_img1.push_back(point1);
             points_img2.push_back(point2);
         }    
-        cout << "Number of correspondesnces: " << points_img1.size() << endl;
+        cout << "Number of correspondences: " << points_img1.size() << endl;
 
         /*
         //-- Draw matches
@@ -166,7 +164,7 @@ int main()
             }
         }
 
-        // add origin in blue
+        // add origin in blue (for reference)
         Point3d origin (0.0, 0.0, 0.0);
         spatialPoints.push_back(origin);
 
@@ -182,104 +180,8 @@ int main()
         strcat_s(outputFile, s.c_str());
         strcat_s(outputFile, ".ply");
 
-        WritePLY(outputFile, spatialPoints, colors);
-        
-
-        /*
-        // Normalize points
-        std::cout << "Normalize points..." << std::endl;
-        vector<Point2d> normalized_points_img1, normalized_points_img2;
-        Mat T_1, T_2;
-        stereo_vision::normalize_points(points_img1, normalized_points_img1, T_1);
-        stereo_vision::normalize_points(points_img2, normalized_points_img2, T_2);
-
-        // Find fundamental matrix
-        cout << "Finding fundamental matrix..." << endl;
-        Mat F_normalized;
-        vector<int> inliers;
-
-        // Since we use the normalized coordinates, we have to normalize the ransac threshold
-        // We scale the threshold with the average scales of the src and dest images
-        // (another solution is to find the inliers according to original coordinates after denormalize the fundamental matrix)
-
-        double normalized_threshold = threshold * ((T_1.at<double>(0, 0) + T_2.at<double>(0, 0)) / 2.);
-        cout << "ransac threshold : " << normalized_threshold << endl;
-
-        stereo_vision::ransac_fundamental_matrix_8points_method(
-            normalized_points_img1,
-            normalized_points_img2,
-            F_normalized,
-            inliers,
-            ransac_max_iteration,      // max iterations
-            normalized_threshold,      // ransac threshold
-            ransac_confidence          // ransac confidence
-        );
-
-        // Local optimization
-        stereo_vision::get_fundamental_matrix_LSQ(
-            normalized_points_img1,
-            normalized_points_img2,
-            inliers,
-            F_normalized
-        );
-
-        cout << "Number of inliers: " << inliers.size() << endl;
-        cout << "F_normalized: " << endl
-            << F_normalized << endl;
-
-        Mat F = T_2.t() * F_normalized * T_1;
-        cout << "F:" << endl
-            << F << endl;
-
-        // Calibration matrix
-        Mat K = read_matrix_from_file("malaga.txt", 3, 3);
-
-        // Essential matrix
-        Mat E = K.t() * F * K;
-        //
-        Mat R1, R2, t;
-        stereo_vision::decompose_essential_matrix(
-            E,
-            R1,
-            R2,
-            t
-        );
-
-
-        Mat P1, P2, R, correct_t;
-        stereo_vision::get_correct_rotation_translation(
-            points_img1,
-            points_img2,
-            inliers,
-            K,
-            R1,
-            R2,
-            t,
-            R,
-            correct_t,
-            P1,
-            P2
-        );
-        */
-
-        /*
-        Mat H = EstimateHRANSAC(pointPairs, 0.2, 500);
-
-        Mat transformedImage = Mat::zeros(1.5 * img1.size().height, 2.0 * img1.size().width, img1.type());
-        transformImage(img1, transformedImage, Mat::eye(3, 3, CV_32F), true);
-        transformImage(img2, transformedImage, H, true);
-
-        imwrite("stitchedImage_" + std::to_string(i) + ".png", transformedImage);
-        */
+        WritePLY(outputFile, spatialPoints, colors);      
     }
-
-    /*
-    namedWindow("Display window", WINDOW_AUTOSIZE); // Create a window for display.
-    // imshow("Display window", transformedImage); // Show our image inside it.
-    waitKey(0); // Wait for a keystroke in the window
-
-    return 0;
-    */
 }
 #else
 int main()
