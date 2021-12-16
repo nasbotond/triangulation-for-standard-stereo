@@ -65,12 +65,14 @@ int main()
         cvtColor(img2, img2_gray, COLOR_BGR2GRAY);
 
         //-- Step 1: Detect the keypoints using SURF Detector, compute the descriptors
-        int minHessian = 400;
+        int minHessian = 1; //400;
         Ptr<SURF> detector = SURF::create(minHessian);
         std::vector<KeyPoint> keypoints1, keypoints2;
         Mat descriptors1, descriptors2;
         detector->detectAndCompute(img1_gray, noArray(), keypoints1, descriptors1);
         detector->detectAndCompute(img2_gray, noArray(), keypoints2, descriptors2);
+        cout << "Number of keypoints1: " << keypoints1.size() << endl;
+        cout << "Number of keypoints2: " << keypoints2.size() << endl;
 
         //-- Step 2: Matching descriptor vectors with a FLANN based matcher
         // Since SURF is a floating-point descriptor NORM_L2 is used
@@ -79,21 +81,26 @@ int main()
         matcher->knnMatch(descriptors1, descriptors2, knn_matches, 2);
 
         //-- Filter matches using the Lowe's ratio test
-        const float ratio_thresh = 0.5f;
+        const float ratio_thresh = 1.0f; // 0.5f
         std::vector<DMatch> good_matches;
         for (size_t i = 0; i < knn_matches.size(); i++)
         {
+            // good_matches.push_back(knn_matches[i][0]);
             if (knn_matches[i][0].distance < ratio_thresh * knn_matches[i][1].distance)
             {
-                good_matches.push_back(knn_matches[i][0]);
+               good_matches.push_back(knn_matches[i][0]);
             }
         }
         
         vector<pair<Point2f, Point2f> > pointPairs;
         vector<Point2d> points_img1, points_img2;
 
-        double deltaX = 400.0;
-        double deltaY = 300.0;
+        // Calibration matrix
+        Mat K = read_matrix_from_file("malaga.txt", 3, 3);
+        double deltaX = K.at<double>(0,2);
+        // cout << deltaX << endl;
+        double deltaY = K.at<double>(1,2);
+        // cout << deltaY << endl;
 
         for (size_t i = 0; i < good_matches.size(); i++)
         {
@@ -105,12 +112,13 @@ int main()
             point1 = keypoints1[good_matches[i].queryIdx].pt;
             point2 = keypoints2[good_matches[i].trainIdx].pt;
             point1.x -= deltaX;
-            point1.y -= deltaY;
+            point1.y = deltaY - point1.y;
             point2.x -= deltaX;
-            point2.y -= deltaY;
+            point2.y = deltaY - point2.y;
             points_img1.push_back(point1);
             points_img2.push_back(point2);
         }    
+        cout << "Number of correspondesnces: " << points_img1.size() << endl;
 
         /*
         //-- Draw matches
@@ -125,7 +133,7 @@ int main()
         */
 
         // IMPLEMENT THE SPECIAL TRIANGULATION METHOD FOR STANDARD STEREO (save point cloud in .xyz or .ply format)
-
+        
         double b = 120.0; // mm (12 cm)
         double f = 3.8; // mm
         double pixel = 166.67; // pixel/mm
@@ -134,26 +142,36 @@ int main()
         vector<Point3d> spatialPoints;
         vector<Point3i> colors;
         Point3i newColor;
+        Point3d newSpatialPoint;
 
         for (int i = 0; i < points_img1.size(); i++)
-        {
-            Point3d newSpatialPoint;
+        {            
             u1 = points_img1[i].x / pixel;
             u2 = points_img2[i].x / pixel;
             v1 = points_img1[i].y / pixel;
             d = u1 - u2;
 
-            newSpatialPoint.z = (b * f) / d;
-            newSpatialPoint.x = (-b * (u1 + u2)) / (2.0 * d);
-            newSpatialPoint.y = (b * v1) / d;
+            newSpatialPoint.z = (b * f) / d / 100.0;
+            newSpatialPoint.x = (-b * (u1 + u2)) / (2.0 * d) / 100.0;
+            newSpatialPoint.y = (b * v1) / d / 100.0;
 
-            spatialPoints.push_back(newSpatialPoint);
+            if (abs(newSpatialPoint.z) <= 500.0 && newSpatialPoint.z >= 0)
+            {
+                spatialPoints.push_back(newSpatialPoint);
 
-            newColor.x = 255;
-            newColor.y = 0;
-            newColor.z = 0;
-            colors.push_back(newColor);
+                newColor.x = 255;
+                newColor.y = 0;
+                newColor.z = 0;
+                colors.push_back(newColor);
+            }
         }
+
+        // add origin in blue
+        Point3d origin (0.0, 0.0, 0.0);
+        spatialPoints.push_back(origin);
+
+        Point3i originColor(0, 0, 255);
+        colors.push_back(originColor);
 
         // Write results into a PLY file. 
         // It can be visualized by open-source 3D application Meshlab (www.meshlab.org)
@@ -165,6 +183,7 @@ int main()
         strcat_s(outputFile, ".ply");
 
         WritePLY(outputFile, spatialPoints, colors);
+        
 
         /*
         // Normalize points
